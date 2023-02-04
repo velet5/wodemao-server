@@ -1,0 +1,13 @@
+version: "3.7"
+
+services:
+  server:
+    image: velet5/wodemao-server:2023.2.1
+    restart: unless-stopped
+    ports:
+      - 3000:127.0.0.1:3000
+    logs:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
