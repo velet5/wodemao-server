@@ -1,7 +1,9 @@
 use axum::{extract::State, routing::post, Json, Router};
+use http::Method;
 use jieba_rs::Jieba;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
+use tower_http::cors::{Any, CorsLayer};
 
 #[tokio::main]
 async fn main() {
@@ -9,9 +11,15 @@ async fn main() {
 
     let jieba = Arc::new(Jieba::new());
 
+    let cors = CorsLayer::new()
+        .allow_methods(vec![Method::GET, Method::POST])
+        .allow_origin(Any)
+        .allow_headers(Any);
+
     let app = Router::new()
         .route("/tokenize", post(tokenize))
-        .with_state(jieba);
+        .with_state(jieba)
+        .layer(cors);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
     tracing::info!("listening on {}", addr);
