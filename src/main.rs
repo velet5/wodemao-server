@@ -1,13 +1,22 @@
+mod repo;
+
 use axum::{extract::State, routing::post, Json, Router};
 use http::Method;
 use jieba_rs::Jieba;
 use serde::{Deserialize, Serialize};
+use sqlx::postgres::PgPoolOptions;
 use std::{net::SocketAddr, sync::Arc};
 use tower_http::cors::{Any, CorsLayer};
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
+
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect("postgres://postgres:postgres@postgres/wodemao")
+        .await
+        .unwrap();
 
     let jieba = Arc::new(Jieba::new());
 
