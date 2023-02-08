@@ -1,27 +1,19 @@
-use async_trait::async_trait;
+use std::sync::Arc;
+
 use sqlx::{Pool, Postgres};
 
-#[async_trait]
-trait WordRepo {
-    async fn find(&self, word: &str) -> Result<Option<Word>, WordRepoError>;
+pub struct WordRepo {
+    pool: Arc<Pool<Postgres>>,
 }
 
-enum WordRepoError {
-    Sqlx(sqlx::error::Error),
-}
-
-impl From<sqlx::error::Error> for WordRepoError {
-    fn from(e: sqlx::error::Error) -> Self {
-        WordRepoError::Sqlx(e)
+impl WordRepo {
+    pub fn new(pool: Arc<Pool<Postgres>>) -> Self
+    where
+        Self: Sized,
+    {
+        WordRepo { pool }
     }
-}
 
-struct WordRepoImpl<'a> {
-    pool: &'a Pool<Postgres>,
-}
-
-#[async_trait]
-impl WordRepo for WordRepoImpl<'_> {
     async fn find(&self, word: &str) -> Result<Option<Word>, WordRepoError> {
         let word_opt = sqlx::query_as::<_, Word>(
             r#"
@@ -31,7 +23,7 @@ impl WordRepo for WordRepoImpl<'_> {
             "#,
         )
         .bind(word)
-        .fetch_optional(self.pool)
+        .fetch_optional(self.pool.as_ref())
         .await?;
 
         Ok(word_opt)
@@ -39,7 +31,7 @@ impl WordRepo for WordRepoImpl<'_> {
 }
 
 #[derive(sqlx::FromRow)]
-struct Word {
+pub struct Word {
     id: uuid::Uuid,
     word: String,
     source: WordSource,
@@ -50,4 +42,14 @@ struct Word {
 #[derive(sqlx::Type)]
 enum WordSource {
     HSK,
+}
+
+enum WordRepoError {
+    Sqlx(sqlx::error::Error),
+}
+
+impl From<sqlx::error::Error> for WordRepoError {
+    fn from(e: sqlx::error::Error) -> Self {
+        WordRepoError::Sqlx(e)
+    }
 }

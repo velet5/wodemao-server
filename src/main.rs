@@ -1,9 +1,11 @@
 mod repo;
+mod service;
 
 use axum::{extract::State, routing::post, Json, Router};
 use http::Method;
-use jieba_rs::Jieba;
+use repo::word_repo::WordRepo;
 use serde::{Deserialize, Serialize};
+use service::sentence_service::SentenceService;
 use sqlx::postgres::PgPoolOptions;
 use std::{net::SocketAddr, sync::Arc};
 use tower_http::cors::{Any, CorsLayer};
@@ -12,13 +14,16 @@ use tower_http::cors::{Any, CorsLayer};
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect("postgres://postgres:postgres@postgres/wodemao")
-        .await
-        .unwrap();
+    let pool = Arc::new(
+        PgPoolOptions::new()
+            .max_connections(5)
+            .connect("postgres://postgres:postgres@postgres/wodemao")
+            .await
+            .unwrap(),
+    );
 
-    let jieba = Arc::new(Jieba::new());
+    let word_repo = Arc::new(WordRepo::new(pool));
+    let sentence_service = Arc::new(SentenceService::new(word_repo));
 
     let cors = CorsLayer::new()
         .allow_methods(vec![Method::GET, Method::POST])
@@ -27,7 +32,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/tokenize", post(tokenize))
-        .with_state(jieba)
+        .with_state(sentence_service)
         .layer(cors);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
@@ -39,10 +44,10 @@ async fn main() {
 }
 
 async fn tokenize(
-    State(jieba): State<Arc<Jieba>>,
+    State(sentence_service): State<Arc<SentenceService>>,
     Json(payload): Json<ParseRequest>,
 ) -> Json<ParseResponse> {
-    let fine = vec![jieba
+    let fine = vec![sentence_service
         .cut(&payload.text, true)
         .iter()
         .map(|s| s.to_string())
