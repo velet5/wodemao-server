@@ -1,14 +1,22 @@
 mod repo;
 mod service;
 
-use axum::{extract::State, routing::post, Json, Router};
-use http::Method;
+use axum::{
+    extract::State,
+    response::{IntoResponse, Response},
+    routing::post,
+    Json, Router,
+};
+use http::{Method, StatusCode};
 use repo::word_repo::WordRepo;
 use serde::{Deserialize, Serialize};
-use service::sentence_service::SentenceService;
+use serde_json::json;
+use service::sentence_service::{SentenceService, SentenceServiceError};
 use sqlx::postgres::PgPoolOptions;
 use std::{net::SocketAddr, sync::Arc};
 use tower_http::cors::{Any, CorsLayer};
+
+use crate::service::sentence_service::WordInfo;
 
 #[tokio::main]
 async fn main() {
@@ -32,6 +40,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/tokenize", post(tokenize))
+        .route("/process", post(process))
         .with_state(sentence_service)
         .layer(cors);
 
@@ -47,12 +56,18 @@ async fn tokenize(
     State(sentence_service): State<Arc<SentenceService>>,
     Json(payload): Json<ParseRequest>,
 ) -> Json<ParseResponse> {
-    let fine = vec![sentence_service
-        .cut(&payload.text, true)
-        .iter()
-        .map(|s| s.to_string())
-        .collect()];
+    let fine = sentence_service.cut(&payload.text, false);
+
     Json(ParseResponse { fine })
+}
+
+async fn process(
+    State(sentence_service): State<Arc<SentenceService>>,
+    Json(payload): Json<ParseRequest>,
+) -> Result<Json<ProcessResponse>, AppError> {
+    let word_info_list = sentence_service.process_sentence(&payload.text).await?;
+
+    Ok(Json(ProcessResponse { word_info_list }))
 }
 
 #[derive(Deserialize)]
@@ -63,4 +78,33 @@ struct ParseRequest {
 #[derive(Serialize)]
 struct ParseResponse {
     fine: Vec<Vec<String>>,
+}
+
+#[derive(Serialize)]
+struct ProcessResponse {
+    word_info_list: Vec<Vec<WordInfo>>,
+}
+
+enum AppError {
+    SentenceService(SentenceServiceError),
+}
+
+impl From<SentenceServiceError> for AppError {
+    fn from(err: SentenceServiceError) -> Self {
+        AppError::SentenceService(err)
+    }
+}
+
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
+        let (status, msg) = match self {
+            AppError::SentenceService(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+        };
+
+        let body = Json(json!({
+            "error": msg,
+        }));
+
+        (status, body).into_response()
+    }
 }

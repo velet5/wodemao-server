@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt::Display, sync::Arc};
 
 use sqlx::{Pool, Postgres};
 
@@ -14,7 +14,7 @@ impl WordRepo {
         WordRepo { pool }
     }
 
-    async fn find(&self, word: &str) -> Result<Option<Word>, WordRepoError> {
+    pub async fn find(&self, word: &str) -> Result<Option<Word>, WordRepoError> {
         let word_opt = sqlx::query_as::<_, Word>(
             r#"
             SELECT id, word, source, pinyin, translations
@@ -33,10 +33,10 @@ impl WordRepo {
 #[derive(sqlx::FromRow)]
 pub struct Word {
     id: uuid::Uuid,
-    word: String,
+    pub word: String,
     source: WordSource,
-    pinyin: String,
-    translations: Vec<String>,
+    pub pinyin: String,
+    pub translations: Vec<String>,
 }
 
 #[derive(sqlx::Type)]
@@ -44,12 +44,21 @@ enum WordSource {
     HSK,
 }
 
-enum WordRepoError {
+#[derive()]
+pub enum WordRepoError {
     Sqlx(sqlx::error::Error),
 }
 
 impl From<sqlx::error::Error> for WordRepoError {
     fn from(e: sqlx::error::Error) -> Self {
         WordRepoError::Sqlx(e)
+    }
+}
+
+impl Display for WordRepoError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WordRepoError::Sqlx(e) => write!(f, "SqlxError: {}", e),
+        }
     }
 }
