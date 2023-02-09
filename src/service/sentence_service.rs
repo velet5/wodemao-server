@@ -44,6 +44,12 @@ impl SentenceService {
 
                 if let Some(word_info) = word_info_opt {
                     sentence_result.push(word_info);
+                } else {
+                    sentence_result.push(WordInfo {
+                        word,
+                        pinyin: "".to_string(),
+                        translations: vec![],
+                    });
                 }
             }
             if sentence_result.len() > 0 {

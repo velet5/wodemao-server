@@ -17,7 +17,7 @@ impl WordRepo {
     pub async fn find(&self, word: &str) -> Result<Option<Word>, WordRepoError> {
         let word_opt = sqlx::query_as::<_, Word>(
             r#"
-            SELECT id, word, source, pinyin, translations
+            SELECT id, word, pinyin, translations
             FROM words
             WHERE word = $1
             "#,
@@ -34,14 +34,8 @@ impl WordRepo {
 pub struct Word {
     id: uuid::Uuid,
     pub word: String,
-    source: WordSource,
     pub pinyin: String,
     pub translations: Vec<String>,
-}
-
-#[derive(sqlx::Type)]
-enum WordSource {
-    HSK,
 }
 
 #[derive()]

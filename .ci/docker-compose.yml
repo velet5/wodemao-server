@@ -1,13 +1,33 @@
-version: "3.7"
+version: "3.3"
 
 services:
   server:
-    image: velet5/wodemao-server:2023.2.1
+    image: velet5/wodemao-server:${VERSION}
     restart: unless-stopped
     ports:
-      - 3000:127.0.0.1:3000
-    logs:
-      driver: "json-file"
+      - "127.0.0.1:3000:3000"
+    logging:
+      driver: "local"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:15.1
+    restart: unless-stopped
+    expose: ["5432"]
+    volumes:
+      - ./data:/var/lib/postgresql/data
+      - ./sql:/sql
+      - ./init-postgres.sql:/docker-entrypoint-initdb.d/init-postgres.sql
+    environment:
+      - POSTGRES_DB=wodemao
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    logging:
+      driver: "local"
       options:
         max-size: "10m"
         max-file: "3"
